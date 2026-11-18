@@ -1,0 +1,156 @@
+package com.uzbekdev.litecinecam;
+
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import org.lwjgl.glfw.GLFW;
+
+public class LiteCineCamClient implements ClientModInitializer {
+
+    // Sozlamalarda ko'rinadigan barcha tugmalar
+    public static KeyBinding orbitKey;      // O - 360 daraja aylanish
+    public static KeyBinding slowMoKey;     // Pastga strelka - Sekinlashtirish
+    public static KeyBinding fastMoKey;     // Tepaga strelka - Tezlashtirish
+    public static KeyBinding normalTimeKey; // R - Oddiy tezlik
+    public static KeyBinding savePosKey;    // P - 1 va 2-nuqtalarni saqlash
+    public static KeyBinding cutCamKey;     // K - 1-nuqtaga keskin o'tish (Cut)
+    public static KeyBinding glideCamKey;   // G - 1-nuqtadan 2-nuqtaga silliq uchish
+
+    // Kamera holatlari
+    private static boolean isOrbiting = false;
+    private static boolean isGliding = false;
+    private static int saveStep = 1;
+
+    // 1-nuqta koordinatalari
+    private static Vec3d pos1 = null;
+    private static float yaw1 = 0, pitch1 = 0;
+
+    // 2-nuqta koordinatalari
+    private static Vec3d pos2 = null;
+    private static float yaw2 = 0, pitch2 = 0;
+
+    // Silliq uchish hisoblagichi
+    private static float glideProgress = 0.0f;
+
+    @Override
+    public void onInitializeClient() {
+        orbitKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.litecinecam.orbit", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_O, "category.litecinecam.main"));
+
+        slowMoKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.litecinecam.slowmo", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_DOWN, "category.litecinecam.main"));
+
+        fastMoKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.litecinecam.fastmo", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UP, "category.litecinecam.main"));
+
+        normalTimeKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.litecinecam.normal", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, "category.litecinecam.main"));
+
+        savePosKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.litecinecam.savepos", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_P, "category.litecinecam.main"));
+
+        cutCamKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.litecinecam.cut", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_K, "category.litecinecam.main"));
+
+        glideCamKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.litecinecam.glide", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.litecinecam.main"));
+
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (client.player == null || client.world == null) return;
+
+            // 1. Aylanish (Orbit) yoqish/o'chirish
+            while (orbitKey.wasPressed()) {
+                isOrbiting = !isOrbiting;
+                isGliding = false;
+                client.player.sendMessage(Text.literal("§a[LiteCineCam] 360 Aylanish: " + (isOrbiting ? "YONIQ" : "O'CHIQ")), true);
+            }
+
+            // 2. Sekinlashtirish (Slow-Motion)
+            while (slowMoKey.wasPressed()) {
+                client.world.getTickManager().setTickRate(5.0f);
+                client.player.sendMessage(Text.literal("§b[LiteCineCam] Sekinlashtirildi (0.25x)"), true);
+            }
+
+            // 3. Tezlashtirish (Fast-Motion)
+            while (fastMoKey.wasPressed()) {
+                client.world.getTickManager().setTickRate(60.0f);
+                client.player.sendMessage(Text.literal("§e[LiteCineCam] Tezlashtirildi (3x)"), true);
+            }
+
+            // 4. Oddiy tezlikka qaytish (1x)
+            while (normalTimeKey.wasPressed()) {
+                client.world.getTickManager().setTickRate(20.0f);
+                client.player.sendMessage(Text.literal("§f[LiteCineCam] Oddiy tezlik (1x)"), true);
+            }
+
+            // 5. Nuqtalarni saqlash (1-marta bosganda Pos 1, 2-marta bosganda Pos 2)
+            while (savePosKey.wasPressed()) {
+                if (saveStep == 1) {
+                    pos1 = client.player.getPos();
+                    yaw1 = client.player.getYaw();
+                    pitch1 = client.player.getPitch();
+                    client.player.sendMessage(Text.literal("§d[LiteCineCam] 1-Nuqta (Boshlanish) saqlandi!"), true);
+                    saveStep = 2;
+                } else {
+                    pos2 = client.player.getPos();
+                    yaw2 = client.player.getYaw();
+                    pitch2 = client.player.getPitch();
+                    client.player.sendMessage(Text.literal("§d[LiteCineCam] 2-Nuqta (Tugash) saqlandi!"), true);
+                    saveStep = 1;
+                }
+            }
+
+            // 6. Kadrni kesish (Cut) - 1-nuqtaga sakrash
+            while (cutCamKey.wasPressed()) {
+                if (pos1 != null) {
+                    isGliding = false;
+                    isOrbiting = false;
+                    client.player.refreshPositionAndAngles(pos1.x, pos1.y, pos1.z, yaw1, pitch1);
+                    client.player.sendMessage(Text.literal("§6[LiteCineCam] Kadr kesildi (Cut)!"), true);
+                } else {
+                    client.player.sendMessage(Text.literal("§c[LiteCineCam] Avval P tugmasi bilan nuqta saqlang!"), true);
+                }
+            }
+
+            // 7. 1-nuqtadan 2-nuqtaga avtomatik silliq uchish (Smooth Glide)
+            while (glideCamKey.wasPressed()) {
+                if (pos1 != null && pos2 != null) {
+                    isGliding = !isGliding;
+                    isOrbiting = false;
+                    glideProgress = 0.0f;
+                    client.player.sendMessage(Text.literal("§a[LiteCineCam] Silliq parvoz: " + (isGliding ? "BOSHLANDI" : "TO'XTADI")), true);
+                } else {
+                    client.player.sendMessage(Text.literal("§c[LiteCineCam] Parvoz uchun P tugmasini 2 marta bosib 2 ta nuqta belgilang!"), true);
+                }
+            }
+
+            // Aylanish harakatini bajarish
+            if (isOrbiting) {
+                client.player.setYaw(client.player.getYaw() + 0.6f);
+            }
+
+            // Silliq uchish harakatini bajarish (100 tick = 5 soniya davomida)
+            if (isGliding && pos1 != null && pos2 != null) {
+                glideProgress += 0.01f; // Uchish tezligi (sekinroq qilish uchun 0.005f qiling)
+                if (glideProgress >= 1.0f) {
+                    glideProgress = 1.0f;
+                    isGliding = false;
+                    client.player.sendMessage(Text.literal("§a[LiteCineCam] Parvoz tugadi!"), true);
+                }
+
+                double x = MathHelper.lerp(glideProgress, pos1.x, pos2.x);
+                double y = MathHelper.lerp(glideProgress, pos1.y, pos2.y);
+                double z = MathHelper.lerp(glideProgress, pos1.z, pos2.z);
+                float yaw = MathHelper.lerpAngleDegrees(glideProgress, yaw1, yaw2);
+                float pitch = MathHelper.lerp(glideProgress, pitch1, pitch2);
+
+                client.player.refreshPositionAndAngles(x, y, z, yaw, pitch);
+            }
+        });
+    }
+}

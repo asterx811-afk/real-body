@@ -1,0 +1,10 @@
+{
+  "category.litecinecam.main": "LiteCineCam (Kino Kamera)",
+  "key.litecinecam.orbit": "360 Aylanish (Orbit Mode)",
+  "key.litecinecam.slowmo": "Sekinlashtirish (Slow-Mo 0.25x)",
+  "key.litecinecam.fastmo": "Tezlashtirish (Fast-Mo 3x)",
+  "key.litecinecam.normal": "Oddiy Tezlik (1x)",
+  "key.litecinecam.savepos": "Nuqtani Saqlash (Save Pos 1/2)",
+  "key.litecinecam.cut": "Kadrni Kesish (Cut to Pos 1)",
+  "key.litecinecam.glide": "Silliq Uchish (Pos 1 -> Pos 2)"
+}

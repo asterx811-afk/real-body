@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "litecinecam",
+  "version": "${version}",
+  "name": "LiteCineCam",
+  "description": "Kuchsiz telefonlar uchun yengil kinematik kamera, aylanish, tezlashtirish va kadr kesish modi.",
+  "authors": [
+    "UzbekDev"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.uzbekdev.litecinecam.LiteCineCamClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
